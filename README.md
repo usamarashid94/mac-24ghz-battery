@@ -113,4 +113,12 @@ Verified against real hardware: the Nova 5 battery read, the Nova offline/out-of
 
 Not yet verified: the generic `BatteryPercent` fallback, since no device on hand publishes one. Reports welcome.
 
-Not implemented: Razer HyperSpeed and Corsair Slipstream, which each need their own protocol. QMK/VIA keyboards on a 2.4 GHz dongle (such as the Keychron Max series) expose raw HID but no standard battery level, so they need a vendor-specific query.
+Not implemented: Razer HyperSpeed and Corsair Slipstream, which each need their own protocol.
+
+### QMK/VIA keyboards on a 2.4 GHz dongle
+
+Tested against a Keychron V3 Max on its Keychron Link dongle, without success. The dongle exposes a QMK raw HID interface (usage page `0xFF60`, usage `0x61`, 32-byte reports) and accepts writes to it, but answers nothing at all — not even VIA `0x01`, get protocol version, which every VIA firmware answers. Two seconds of passive listening yields no reports either, and the dongle's other interface (usage page `0x8C`) returns no readable feature report.
+
+The likely explanation is that the dongle forwards keystrokes without bridging the VIA channel to the keyboard, which matches Keychron's guidance to configure their wireless boards over a USB-C cable. If so, battery over 2.4 GHz isn't exposed at all.
+
+Over Bluetooth these boards should publish a standard battery level, in which case the generic `BatteryPercent` path picks them up with no extra code.
