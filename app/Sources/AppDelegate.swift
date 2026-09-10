@@ -72,7 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isReading = false
-                self.readings = readings
+                // Only what is actually connected right now; a device that has
+                // gone away drops out and returns on its own when it answers.
+                self.readings = visibleReadings(readings)
                 self.lastUpdate = Date()
                 self.updateStatusItem()
                 self.rebuildMenu()
@@ -116,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
 
         if readings.isEmpty {
-            let item = NSMenuItem(title: "No 2.4 GHz dongles connected", action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: "No 2.4 GHz devices connected", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         }

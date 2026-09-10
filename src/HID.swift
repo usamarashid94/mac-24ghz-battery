@@ -127,7 +127,26 @@ final class HIDSession {
     private let bufferSize: Int
     private let sink: ReportSink
 
+    /// HID pages whose collections carry what the user is typing, clicking or
+    /// pressing. Opening one streams those events into this process.
+    ///
+    /// Battery never lives on these pages — it is always on a vendor page — so
+    /// refusing them costs nothing and removes the possibility entirely. This is
+    /// enforced here, in the only place that opens a device, rather than left to
+    /// each caller to remember.
+    private static let forbiddenUsagePages: Set<Int> = [
+        0x01, // Generic Desktop: keyboards, mice, pointers
+        0x07, // Keyboard/Keypad
+        0x0C, // Consumer: media and system keys
+    ]
+
     init?(device: IOHIDDevice, bufferSize: Int) {
+        let page = intProperty(device, kIOHIDPrimaryUsagePageKey) ?? 0
+        guard !HIDSession.forbiddenUsagePages.contains(page) else {
+            debugLog(String(format: "refusing to open input collection on page 0x%02X", page))
+            return nil
+        }
+
         guard IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone)) == kIOReturnSuccess else {
             debugLog("open failed")
             return nil

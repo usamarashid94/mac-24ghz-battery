@@ -5,6 +5,22 @@ import Foundation
 
 // MARK: - Output
 
+/// Devices worth putting on screen.
+///
+/// A device that has gone away — dongle unplugged, headset switched off, mouse
+/// asleep — is dropped rather than lingering with a remembered level, so the
+/// display reflects what is actually connected right now. It reappears on its
+/// own as soon as it answers again.
+///
+/// Set WIRELESS_BATTERY_SHOW_OFFLINE=1 to keep showing them with their last
+/// known level and its age instead.
+let showOfflineDevices: Bool =
+    ProcessInfo.processInfo.environment["WIRELESS_BATTERY_SHOW_OFFLINE"] == "1"
+
+func visibleReadings(_ readings: [DeviceReading]) -> [DeviceReading] {
+    showOfflineDevices ? readings : readings.filter(\.online)
+}
+
 func icon(for reading: DeviceReading) -> String {
     let lowercased = reading.name.lowercased()
     if lowercased.contains("arctis") || lowercased.contains("headset") { return "🎧" }
@@ -71,9 +87,10 @@ func printJSON(_ readings: [DeviceReading]) {
     print(String(decoding: data, as: UTF8.self))
 }
 
-func printPlain(_ readings: [DeviceReading]) {
+func printPlain(_ allReadings: [DeviceReading]) {
+    let readings = visibleReadings(allReadings)
     if readings.isEmpty {
-        print("No 2.4 GHz devices found.")
+        print("No 2.4 GHz devices connected.")
         return
     }
     for reading in readings {
@@ -125,11 +142,12 @@ func menuBarTitle(for readings: [DeviceReading]) -> String {
     return segments.joined(separator: "  ")
 }
 
-func printSwiftBar(_ readings: [DeviceReading]) {
+func printSwiftBar(_ allReadings: [DeviceReading]) {
+    let readings = visibleReadings(allReadings)
     if readings.isEmpty {
         print("🔌")
         print("---")
-        print("No 2.4 GHz dongles connected | color=\(Palette.dim)")
+        print("No 2.4 GHz devices connected | color=\(Palette.dim)")
         return
     }
 

@@ -76,16 +76,19 @@ Reads happen on a background queue, never the main thread: an unreachable device
 
 A desktop or Notification Center widget needs Xcode, a signing identity, and an App Group container, because a widget extension is sandboxed and can't do IOKit HID work itself — the reading has to happen elsewhere and be handed over as a snapshot. More to the point, WidgetKit budgets timeline reloads to a few dozen a day, so a widget would update roughly every 15 minutes. That is *less* live than the menu bar, for more moving parts.
 
-## Sleeping devices
+## Disconnected devices
 
-A 2.4 GHz mouse or headset stops answering when it sleeps or powers off, which is exactly when you're most likely to look at a battery widget. Dropping it from the display would be the wrong answer, so the last good reading is cached and shown aged instead:
+Only devices that answer right now are shown. A headset switched off, a mouse gone to sleep, or an unplugged dongle drops out of the display, and comes back on its own as soon as it answers again — within the refresh interval, or immediately when the menu is opened.
 
+The last good reading is still cached, so if you would rather see departed devices with their remembered level and its age:
+
+```bash
+WIRELESS_BATTERY_SHOW_OFFLINE=1 wireless-battery
+# 🖱 Logitech G502 X LIGHTSPEED   54% · asleep 7m
+# 🎧 SteelSeries Arctis Nova 5    70% · off or out of range 49m
 ```
-🖱 Logitech G502 X LIGHTSPEED   54% · asleep 7m
-🎧 SteelSeries Arctis Nova 5    off or out of range
-```
 
-Remembered levels are dimmed, and the menu bar marks one with a trailing `·`. The cache lives in `~/Library/Caches/mac-24ghz-battery.json` and is safe to delete.
+`--json` always reports every device it found, connected or not, with `online` and `stale` flags. The cache lives in `~/Library/Caches/mac-24ghz-battery.json` and is safe to delete.
 
 An empty Logitech pairing slot is told apart from a sleeping device by its reply: an empty slot answers with a HID++ 1.0 error (`0x8F`) carrying code `0x08`, "unknown device", while a paired-but-sleeping device says nothing at all.
 
@@ -126,6 +129,10 @@ The families share that request but **not** the reply layout, which is why the m
 Getting that wrong doesn't fail loudly: parsing a Nova 7 with the Nova 5 layout reports a status byte as a battery percentage. Product IDs and layouts follow HeadsetControl.
 
 No Input Monitoring permission is needed, because vendor usage pages aren't subject to the consent prompt that keyboards and pointing devices are. A read takes about 10 ms.
+
+### Input collections are never opened
+
+`HIDSession` refuses to open any collection on HID usage page `0x01` (Generic Desktop), `0x07` (Keyboard/Keypad) or `0x0C` (Consumer). Opening one streams the user's keystrokes and cursor movement into the process. Battery always lives on a vendor page, so refusing these costs nothing — and the refusal is enforced in the single function that opens devices, rather than left to each driver to remember.
 
 ## Adding devices
 
