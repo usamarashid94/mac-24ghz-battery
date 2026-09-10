@@ -3,7 +3,7 @@
     "vendorID": 4152,
     "productID": 8787,
     "name": "SteelSeries Arctis Nova 5X",
-    "driver": "steelseries-nova",
+    "driver": "steelseries",
     "variant": "nova5",
     "verified": false
   }

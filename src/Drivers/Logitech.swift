@@ -33,6 +33,8 @@ enum Logitech {
 
     static let featureUnifiedBattery: UInt16 = 0x1004
     static let featureBatteryLevelStatus: UInt16 = 0x1000
+    /// Older gaming mice report millivolts instead of a percentage.
+    static let featureBatteryVoltage: UInt16 = 0x1001
     static let featureDeviceName: UInt16 = 0x0005
 
     /// Paired-device slots to probe. Lightspeed receivers use slot 1; Unifying
@@ -148,6 +150,61 @@ enum Logitech {
         return (Int(reply[4]), reply[6] == 0x01)
     }
 
+
+    /// Feature 0x1001: millivolts, not a percentage.
+    ///
+    /// Discharge is not linear, so a curve is needed. This one is Solaar's
+    /// (GPL-2.0), interpolated linearly between points — the same mapping their
+    /// users have validated against Logitech's own reporting.
+    static let voltageCurve: [(millivolts: Int, percent: Int)] = [
+        (4186, 100), (4067, 90), (3989, 80), (3922, 70), (3859, 60),
+        (3811, 50), (3778, 40), (3751, 30), (3717, 20), (3671, 10),
+        (3646, 5), (3579, 2), (3500, 0),
+    ]
+
+    static func percentage(forMillivolts millivolts: Int) -> Int {
+        guard let first = voltageCurve.first, let last = voltageCurve.last else { return 0 }
+        if millivolts >= first.millivolts { return first.percent }
+        if millivolts <= last.millivolts { return last.percent }
+
+        for index in 0..<(voltageCurve.count - 1) {
+            let high = voltageCurve[index]
+            let low = voltageCurve[index + 1]
+            if millivolts >= low.millivolts && millivolts <= high.millivolts {
+                let span = Double(high.millivolts - low.millivolts)
+                guard span > 0 else { return low.percent }
+                let ratio = Double(millivolts - low.millivolts) / span
+                let percent = Double(low.percent) + Double(high.percent - low.percent) * ratio
+                return Int(percent.rounded())
+            }
+        }
+        return 0
+    }
+
+    static func batteryVoltage(
+        session: HIDSession,
+        deviceIndex: UInt8,
+        index: UInt8
+    ) -> (percent: Int, charging: Bool)? {
+        guard let reply = request(
+            session: session,
+            deviceIndex: deviceIndex,
+            featureIndex: index,
+            function: 0x00
+        ), !isError(reply), reply.count >= 7 else { return nil }
+
+        let millivolts = Int(reply[4]) << 8 | Int(reply[5])
+        // A plausible single-cell lithium reading. Anything else means the
+        // layout is wrong, and a wrong layout must not become a battery level.
+        guard (2500...5000).contains(millivolts) else {
+            debugLog("implausible battery voltage \(millivolts) mV, ignoring")
+            return nil
+        }
+        // Bit 7 of the status byte marks charging.
+        let charging = (reply[6] & 0x80) != 0
+        return (percentage(forMillivolts: millivolts), charging)
+    }
+
     /// Feature 0x0005: the marketing name, e.g. "G502 X". Falls back to nil.
     static func deviceName(session: HIDSession, deviceIndex: UInt8) -> String? {
         guard case let .index(nameIndex) = featureIndex(
@@ -233,6 +290,16 @@ enum Logitech {
                 feature: featureBatteryLevelStatus
             ) {
                 result = batteryLevelStatus(session: session, deviceIndex: deviceIndex, index: index)
+            }
+
+            // Older gaming mice implement neither of the above and report
+            // millivolts, which need a discharge curve to become a percentage.
+            if result == nil, case let .index(index) = featureIndex(
+                session: session,
+                deviceIndex: deviceIndex,
+                feature: featureBatteryVoltage
+            ) {
+                result = batteryVoltage(session: session, deviceIndex: deviceIndex, index: index)
             }
 
             guard let result else {

@@ -33,7 +33,7 @@ Drop a JSON file at `~/.config/wireless-battery/devices.json` to add or correct 
     "vendorID": 4152,
     "productID": 8787,
     "name": "SteelSeries Arctis Nova 5X",
-    "driver": "steelseries-nova",
+    "driver": "steelseries",
     "variant": "nova5",
     "verified": true
   }
@@ -44,14 +44,27 @@ Drop a JSON file at `~/.config/wireless-battery/devices.json` to add or correct 
 
 If it works, send a pull request adding the entry to `DeviceTable.builtin`.
 
+## Testing your change
+
+```bash
+./wireless-battery --selftest   # parsers, formatting, guards, device table
+./qa.sh                         # everything, including builds and stability
+```
+
+Both must pass before a pull request. If you add a protocol variant, add frames for it to `src/SelfTest.swift` — including at least one frame that must be **rejected**. Reply parsing is where this project gets things wrong, and a wrong offset produces a plausible-looking number rather than an error.
+
+Adding a device to the table is also checked: the suite fails on an unknown driver id, an unknown variant name, or a duplicate product ID.
+
 ## Writing a driver
 
 A driver conforms to `BatteryDriver` in `src/Driver.swift`: `matches` decides whether it handles a HID collection, `read` returns one reading per physical device behind it. `HIDSession` handles opening the device and pairing requests with replies; open once and reuse it, since tearing a session down repeatedly while a device is sending crashes.
 
-Return a reading with `online: false` and a `note` for a device that is present but unreachable, rather than returning nothing — a sleeping mouse should keep its place in the display with its last known level, not vanish.
+Return a reading with `online: false` and a `note` for a device that is present but unreachable, rather than returning nothing. Drivers report state; the display layer decides what to show, and it hides offline devices by default while keeping their last known level in the cache.
+
+Reject a reply you cannot make sense of instead of clamping it into range. A level of 200 means the offsets are wrong, and clamping it to 100 turns a detectable bug into a confident lie.
 
 Protocols for most vendors are already documented in GPL projects worth porting from rather than reverse-engineering: [HeadsetControl](https://github.com/Sapd/HeadsetControl) for headsets, [Solaar](https://github.com/pwr-Solaar/Solaar) for Logitech (including the voltage-to-percentage curves older devices need), [OpenRazer](https://github.com/openrazer/openrazer) for Razer, [ckb-next](https://github.com/ckb-next/ckb-next) for Corsair. This project is GPL-3.0, so ports from them are license-clean — credit the source in a comment.
 
 ## What cannot be supported
 
-QMK/VIA keyboards on a 2.4 GHz dongle, such as the Keychron Max series. The dongle forwards keystrokes without bridging the configuration channel, which matches Keychron's own documentation that the Launcher only detects the keyboard over a wired connection. There is nothing behind the dongle to ask. See the README for the full probe result.
+Keychron keyboards, over any transport. Their firmware has no battery command: [`keychron_raw_hid.c`](https://github.com/Keychron/qmk_firmware/blob/master/keyboards/keychron/common/keychron_raw_hid.c) handles `0xA0`-`0xAB` and none of them is battery. The level is measured, but it goes only to `wireless_transport.update_bat_level()` and out over Bluetooth's BLE Battery Service. Confirmed on a V3 Max: the keyboard answers `0xA0`-`0xA3` over its cable, and the Keychron Link dongle relays none of them. Their *mice* are a different matter and are supported.

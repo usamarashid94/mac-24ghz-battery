@@ -46,6 +46,11 @@ func statusText(for reading: DeviceReading) -> String {
 }
 
 func printJSON(_ readings: [DeviceReading]) {
+    print(jsonString(for: readings))
+}
+
+/// Separated from printing so tests can assert on it.
+func jsonString(for readings: [DeviceReading]) -> String {
     let payload: [[String: Any]] = readings.map { reading in
         var entry: [String: Any] = [
             "name": reading.name,
@@ -81,10 +86,9 @@ func printJSON(_ readings: [DeviceReading]) {
               options: [.prettyPrinted, .sortedKeys]
           )
     else {
-        print("{\"devices\":[]}")
-        return
+        return "{\"devices\":[]}"
     }
-    print(String(decoding: data, as: UTF8.self))
+    return String(decoding: data, as: UTF8.self)
 }
 
 func printPlain(_ allReadings: [DeviceReading]) {

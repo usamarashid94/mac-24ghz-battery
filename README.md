@@ -13,9 +13,11 @@ macOS shows battery for Bluetooth accessories, but devices on a proprietary 2.4 
 
 ## What it reads
 
-**SteelSeries Arctis Nova base stations** over their vendor HID interface — the Nova 5 family (verified) and the Nova 7 family (implemented, unverified). See [Protocol](#protocol) below.
+**SteelSeries Arctis headsets** over their vendor HID interface — the Nova 5, Nova 7, Arctis 7/Pro, Arctis 1 and Arctis 9 families. Each family parses its own reply layout; see [Protocol](#protocol) below.
 
-**Logitech Lightspeed and Unifying receivers** over HID++ 2.0, including the device's own marketing name, so a G502 X reports as "Logitech G502 X LIGHTSPEED" rather than "USB Receiver".
+**Logitech Lightspeed and Unifying receivers** over HID++ 2.0, covering all three battery features these devices use — unified battery (`0x1004`), battery level status (`0x1000`), and raw voltage (`0x1001`) converted through a discharge curve for older gaming mice that report millivolts. Device names come from the hardware, so a G502 X reports as "Logitech G502 X LIGHTSPEED" rather than "USB Receiver".
+
+**Keychron wireless mice** over their dongle's vendor protocol. Note this does *not* extend to Keychron keyboards — see [QMK/VIA keyboards](#qmkvia-keyboards-on-a-24-ghz-dongle) for why.
 
 **Any HID device that publishes a standard `BatteryPercent`** to macOS. No per-device code, so conforming hardware is picked up automatically when you plug it in.
 
@@ -49,6 +51,7 @@ wireless-battery --all        # include Bluetooth devices
 wireless-battery --debug      # dump HID traffic to stderr
 wireless-battery --probe      # read-only diagnostics for unsupported hardware
 wireless-battery --devices    # what this build knows about
+wireless-battery --selftest   # run the parser and formatting tests
 ```
 
 The menu bar shows up to three devices side by side and the dropdown lists them all. When more devices than that are connected, the lowest batteries take the slots, since those are the ones worth knowing about:
@@ -134,6 +137,17 @@ No Input Monitoring permission is needed, because vendor usage pages aren't subj
 
 `HIDSession` refuses to open any collection on HID usage page `0x01` (Generic Desktop), `0x07` (Keyboard/Keypad) or `0x0C` (Consumer). Opening one streams the user's keystrokes and cursor movement into the process. Battery always lives on a vendor page, so refusing these costs nothing — and the refusal is enforced in the single function that opens devices, rather than left to each driver to remember.
 
+## Testing
+
+Most supported devices cannot be tested here, because nobody owns all of them. What *can* be tested is the part that actually goes wrong — reply parsing. A wrong byte offset or a missing range check doesn't fail loudly on real hardware; it reports a status byte as a battery percentage, which is exactly the bug that shipped once. So every protocol variant is exercised against crafted frames with known answers, including frames that must be *rejected*:
+
+```bash
+./wireless-battery --selftest   # parsers, voltage curve, formatting, guards, table integrity
+./qa.sh                         # the above plus builds, stability, memory, hardware smoke test
+```
+
+The suite is checked with mutation testing — deliberately breaking a byte offset, the voltage curve, or the input-page guard, and confirming the tests catch it. A test that never fails isn't testing anything.
+
 ## Adding devices
 
 There is no battery standard to lean on: a scan of every HID collection on a typical Mac finds none declaring the HID Battery System usage page (`0x85`) or Generic Device Controls' Battery Strength. Coverage is therefore per-vendor, and grows one device at a time.
@@ -152,11 +166,13 @@ GPL-3.0, matching HeadsetControl, since the protocol details were learned from r
 
 ## Status
 
-Verified against real hardware: the Nova 5 battery read, the Nova offline/out-of-range branch, and the Logitech HID++ path (G502 X Lightspeed, including the name lookup).
+Verified against real hardware: the Arctis Nova 5 read and its offline branch, and the Logitech HID++ path (G502 X Lightspeed, including the name lookup).
 
-Implemented but unverified, ported from HeadsetControl and marked as such by `--devices`: the Arctis Nova 7 family, in both its discrete 0-4 and percentage firmware variants. Also unverified: the generic `BatteryPercent` fallback, since no device on hand publishes one. Reports welcome.
+Everything else is ported from another project's source and marked unverified — `wireless-battery --devices` shows which is which, with `✓` meaning someone confirmed it against the physical device. Unverified does not mean untested: every protocol variant is exercised against crafted frames by `--selftest`, including frames it must reject, so a wrong offset surfaces as an unreadable reply rather than a confident wrong number. What cannot be checked without the hardware is whether the frames themselves are right.
 
-Not implemented: Razer HyperSpeed and Corsair Slipstream, which each need their own protocol.
+Confirming a device is a two-minute job — compare the reading with the vendor's own software, check it moves as the battery drains, then flip `verified` in the table and send a pull request.
+
+Not implemented: Razer HyperSpeed and Corsair Slipstream. Both are documented in GPL projects (OpenRazer, ckb-next) and would be welcome. Razer needs care: its control interface often sits on a Generic Desktop page, which `HIDSession` refuses to open, so it needs a feature-report-only path that never registers an input callback.
 
 ### QMK/VIA keyboards on a 2.4 GHz dongle
 

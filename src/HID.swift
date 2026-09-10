@@ -134,15 +134,19 @@ final class HIDSession {
     /// refusing them costs nothing and removes the possibility entirely. This is
     /// enforced here, in the only place that opens a device, rather than left to
     /// each caller to remember.
-    private static let forbiddenUsagePages: Set<Int> = [
+    static let forbiddenUsagePages: Set<Int> = [
         0x01, // Generic Desktop: keyboards, mice, pointers
         0x07, // Keyboard/Keypad
         0x0C, // Consumer: media and system keys
     ]
 
+    static func isForbiddenPage(_ page: Int) -> Bool {
+        forbiddenUsagePages.contains(page)
+    }
+
     init?(device: IOHIDDevice, bufferSize: Int) {
         let page = intProperty(device, kIOHIDPrimaryUsagePageKey) ?? 0
-        guard !HIDSession.forbiddenUsagePages.contains(page) else {
+        guard !HIDSession.isForbiddenPage(page) else {
             debugLog(String(format: "refusing to open input collection on page 0x%02X", page))
             return nil
         }
@@ -169,6 +173,7 @@ final class HIDSession {
     func exchange(
         reportID: UInt8,
         request: [UInt8],
+        reportType: IOHIDReportType = kIOHIDReportTypeOutput,
         timeout: CFTimeInterval,
         accept: @escaping ([UInt8]) -> Bool
     ) -> [UInt8]? {
@@ -177,9 +182,11 @@ final class HIDSession {
         debugLog("write report id=0x\(String(format: "%02x", reportID)): \(hex(request))")
 
         // A numbered report carries its ID as the first payload byte; report 0 does not.
+        // Some vendors take the request as a feature report and answer on the
+        // input pipe, so the type is the caller's choice.
         let sent = IOHIDDeviceSetReport(
             device,
-            kIOHIDReportTypeOutput,
+            reportType,
             CFIndex(reportID),
             request,
             request.count

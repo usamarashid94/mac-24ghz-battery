@@ -41,6 +41,7 @@ protocol BatteryDriver {
 let drivers: [BatteryDriver] = [
     SteelSeriesDriver(),
     LogitechDriver(),
+    KeychronMouseDriver(),
     GenericHIDDriver(),
 ]
 

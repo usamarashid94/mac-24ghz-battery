@@ -22,6 +22,7 @@ if arguments.contains("--help") || arguments.contains("-h") {
       --probe      read-only diagnostics for every USB HID device, to report
                    hardware that isn't supported yet
       --devices    list the devices this build knows about
+      --selftest   run the parser and formatting tests
       --all        also include Bluetooth devices that report battery
       --debug      dump HID traffic to stderr
       --help       this message
@@ -30,6 +31,10 @@ if arguments.contains("--help") || arguments.contains("-h") {
 }
 
 debugEnabled = arguments.contains("--debug")
+
+if arguments.contains("--selftest") {
+    exit(SelfTest.run())
+}
 
 if arguments.contains("--probe") {
     Probe.run(includeAll: arguments.contains("--all"))
