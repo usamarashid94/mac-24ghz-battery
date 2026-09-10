@@ -128,20 +128,29 @@ let menuBarLimit: Int = {
 /// the lowest batteries win the slots, since those are the ones that need
 /// attention — but they are then shown in the display's own order so the icons
 /// don't reshuffle as levels drift.
-func menuBarTitle(for readings: [DeviceReading]) -> String {
+func menuBarSelection(for readings: [DeviceReading]) -> [DeviceReading] {
     let byUrgency = readings.sorted { lhs, rhs in
         // A device with no level at all sorts last.
         (lhs.percent ?? Int.max) < (rhs.percent ?? Int.max)
     }
     let chosen = Set(byUrgency.prefix(menuBarLimit).map(\.key))
-    let shown = readings.filter { chosen.contains($0.key) }
+    return readings.filter { chosen.contains($0.key) }
+}
+
+/// The level text for one device, without its icon.
+func menuBarLevel(for reading: DeviceReading) -> String {
+    let level = reading.percent.map { "\($0)%" } ?? "—"
+    let charge = reading.charging && reading.online ? "⚡︎" : ""
+    // A trailing dot marks a level that's remembered rather than current.
+    let staleMark = reading.stale ? "·" : ""
+    return "\(level)\(charge)\(staleMark)"
+}
+
+func menuBarTitle(for readings: [DeviceReading]) -> String {
+    let shown = menuBarSelection(for: readings)
 
     let segments = shown.map { reading -> String in
-        let level = reading.percent.map { "\($0)%" } ?? "—"
-        let charge = reading.charging && reading.online ? "⚡︎" : ""
-        // A trailing dot marks a level that's remembered rather than current.
-        let staleMark = reading.stale ? "·" : ""
-        return "\(icon(for: reading)) \(level)\(charge)\(staleMark)"
+        return "\(icon(for: reading)) \(menuBarLevel(for: reading))"
     }
     return segments.joined(separator: "  ")
 }

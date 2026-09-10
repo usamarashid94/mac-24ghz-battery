@@ -85,8 +85,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func log() {
         guard logEnabled else { return }
-        let title = statusItem.button?.title ?? ""
-        FileHandle.standardError.write(Data("[app] title: \(title)\n".utf8))
+        let title = statusItem.button?.attributedTitle.string ?? ""
+        FileHandle.standardError.write(
+            Data("[app] title: \(title)  (glyphs drawn as SF Symbols)\n".utf8)
+        )
         for reading in readings {
             FileHandle.standardError.write(
                 Data("[app] row: \(icon(for: reading)) \(reading.name) — \(statusText(for: reading))\n".utf8)
@@ -99,10 +101,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
         guard !readings.isEmpty else {
-            button.title = "🔌"
+            button.attributedTitle = NSAttributedString(string: "")
+            button.image = NSImage(
+                systemSymbolName: "powerplug",
+                accessibilityDescription: "No devices connected"
+            )
+            button.image?.isTemplate = true
             return
         }
-        button.title = menuBarTitle(for: readings)
+
+        // Drawn as an attributed string rather than an image plus title,
+        // because several devices share one status item.
+        button.image = nil
+        let line = NSMutableAttributedString()
+        for (index, reading) in menuBarSelection(for: readings).enumerated() {
+            if index > 0 { line.append(NSAttributedString(string: "  ")) }
+            line.append(Symbols.attributedSegment(for: reading))
+        }
+        button.attributedTitle = line
     }
 
     private func color(for reading: DeviceReading) -> NSColor {
@@ -127,13 +143,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
             item.isEnabled = false
 
-            let line = NSMutableAttributedString(
-                string: "\(icon(for: reading))  \(reading.name)   ",
+            let line = NSMutableAttributedString()
+            if let image = Symbols.image(for: reading, pointSize: 13) {
+                let attachment = NSTextAttachment()
+                attachment.image = image
+                let glyph = NSMutableAttributedString(attachment: attachment)
+                glyph.addAttribute(
+                    .baselineOffset,
+                    value: -1.0,
+                    range: NSRange(location: 0, length: glyph.length)
+                )
+                line.append(glyph)
+                line.append(NSAttributedString(string: "  "))
+            }
+            line.append(NSAttributedString(
+                string: "\(reading.name)   ",
                 attributes: [
                     .font: NSFont.menuFont(ofSize: 13),
                     .foregroundColor: NSColor.labelColor,
                 ]
-            )
+            ))
             line.append(NSAttributedString(
                 string: statusText(for: reading),
                 attributes: [

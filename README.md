@@ -111,7 +111,17 @@ Set that variable in the plugin script to change the cap.
 
 ## Menu bar app
 
-There is also a native menu bar app, if you'd rather not run SwiftBar:
+A native menu bar app, if you'd rather not run SwiftBar.
+
+**[Download the latest .dmg](https://github.com/usamarashid94/mac-24ghz-battery/releases/latest)** — universal, Apple Silicon and Intel.
+
+macOS will refuse to open it the first time: the app is ad-hoc signed but **not notarized**, because notarizing requires a paid Apple Developer account. Either right-click the app and choose Open, or clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Wireless Battery.app"
+```
+
+If you would rather not trust a binary — reasonable, and the reason the source is here — build it yourself:
 
 ```bash
 ./build-app.sh

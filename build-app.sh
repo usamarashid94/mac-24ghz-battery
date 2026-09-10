@@ -14,10 +14,21 @@ mkdir -p "$MACOS"
 SHARED=$(find src -name '*.swift' ! -name 'main.swift' | sort)
 APP_SOURCES=$(find app/Sources -name '*.swift' ! -name 'main.swift' | sort)
 
-swiftc -O -framework AppKit -framework IOKit -framework CoreFoundation \
-    -framework ServiceManagement \
-    -o "$MACOS/WirelessBattery" \
-    $SHARED $APP_SOURCES app/Sources/main.swift
+# Universal: an Apple Silicon Mac happily cross-compiles the Intel slice, and
+# shipping arm64-only would silently exclude every Intel Mac from a download.
+FRAMEWORKS="-framework AppKit -framework IOKit -framework CoreFoundation -framework ServiceManagement"
+mkdir -p build/arch
+
+for arch in arm64 x86_64; do
+    swiftc -O $FRAMEWORKS \
+        -target "${arch}-apple-macos13.0" \
+        -o "build/arch/WirelessBattery-${arch}" \
+        $SHARED $APP_SOURCES app/Sources/main.swift
+done
+
+lipo -create -output "$MACOS/WirelessBattery" \
+    build/arch/WirelessBattery-arm64 build/arch/WirelessBattery-x86_64
+rm -rf build/arch
 
 cp app/Info.plist "$APP/Contents/Info.plist"
 
