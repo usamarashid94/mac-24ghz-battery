@@ -734,9 +734,16 @@ enum Palette {
     static let dim = "#8A97A5"
 }
 
-func printSwiftBar(_ readings: [DeviceReading]) {
-    let reporting = readings.filter { $0.online && $0.percent != nil }
+/// How many devices the menu bar shows at once. Menu bar space is scarce, so
+/// this is capped; override with WIRELESS_BATTERY_MENUBAR_MAX.
+let menuBarLimit: Int = {
+    guard let raw = ProcessInfo.processInfo.environment["WIRELESS_BATTERY_MENUBAR_MAX"],
+          let value = Int(raw), value > 0
+    else { return 3 }
+    return value
+}()
 
+func printSwiftBar(_ readings: [DeviceReading]) {
     if readings.isEmpty {
         print("🔌")
         print("---")
@@ -744,18 +751,25 @@ func printSwiftBar(_ readings: [DeviceReading]) {
         return
     }
 
-    // Menu bar: the lowest battery, since that's the one that needs attention.
-    // Prefer a live reading, but a stale one beats showing nothing.
-    let candidates = reporting.isEmpty ? readings.filter { $0.percent != nil } : reporting
-    if let lowest = candidates.min(by: { ($0.percent ?? 100) < ($1.percent ?? 100) }) {
-        let level = lowest.percent.map { "\($0)%" } ?? "—"
-        let charge = lowest.charging && lowest.online ? " ⚡︎" : ""
-        // A trailing dot marks a level that's remembered rather than current.
-        let staleMark = lowest.stale ? " ·" : ""
-        print("\(icon(for: lowest)) \(level)\(charge)\(staleMark)")
-    } else {
-        print("\(icon(for: readings[0])) —")
+    // Menu bar: up to `menuBarLimit` devices side by side. When there are more
+    // than fit, the lowest batteries win the slots, since those are the ones
+    // that need attention — but they're then shown in the display's own order so
+    // the icons don't reshuffle as levels drift.
+    let byUrgency = readings.sorted { lhs, rhs in
+        // A device with no level at all sorts last.
+        (lhs.percent ?? Int.max) < (rhs.percent ?? Int.max)
     }
+    let chosen = Set(byUrgency.prefix(menuBarLimit).map(\.key))
+    let shown = readings.filter { chosen.contains($0.key) }
+
+    let segments = shown.map { reading -> String in
+        let level = reading.percent.map { "\($0)%" } ?? "—"
+        let charge = reading.charging && reading.online ? "⚡︎" : ""
+        // A trailing dot marks a level that's remembered rather than current.
+        let staleMark = reading.stale ? "·" : ""
+        return "\(icon(for: reading)) \(level)\(charge)\(staleMark)"
+    }
+    print(segments.joined(separator: "  "))
 
     print("---")
     for reading in readings {

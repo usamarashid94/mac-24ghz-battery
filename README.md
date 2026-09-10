@@ -5,7 +5,7 @@ Battery level for 2.4 GHz wireless devices — the ones on a USB dongle — in t
 macOS shows battery for Bluetooth accessories, but devices on a proprietary 2.4 GHz dongle usually publish nothing at all. A SteelSeries Arctis Nova base station, for example, has no `BatteryPercent` anywhere in the IORegistry. This asks the hardware directly.
 
 ```
-🖱 54%
+🖱 54%  🎧 70%
 ────────────────────────────────────
 🖱 Logitech G502 X LIGHTSPEED   54%
 🎧 SteelSeries Arctis Nova 5    69%
@@ -49,7 +49,13 @@ wireless-battery --all        # include Bluetooth devices
 wireless-battery --debug      # dump HID traffic to stderr
 ```
 
-The menu bar shows the lowest battery of any connected device; the dropdown lists them all.
+The menu bar shows up to three devices side by side and the dropdown lists them all. When more devices than that are connected, the lowest batteries take the slots, since those are the ones worth knowing about:
+
+```bash
+WIRELESS_BATTERY_MENUBAR_MAX=1 wireless-battery --swiftbar   # just the lowest
+```
+
+Set that variable in the plugin script to change the cap.
 
 ## Sleeping devices
 
