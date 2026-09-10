@@ -13,7 +13,7 @@ macOS shows battery for Bluetooth accessories, but devices on a proprietary 2.4 
 
 ## What it reads
 
-**SteelSeries Arctis Nova base stations** (Nova 3 / 5 / 5X / 7 / 7X / 7P) over their vendor HID interface — see [Protocol](#protocol) below.
+**SteelSeries Arctis Nova base stations** over their vendor HID interface — the Nova 5 family (verified) and the Nova 7 family (implemented, unverified). See [Protocol](#protocol) below.
 
 **Logitech Lightspeed and Unifying receivers** over HID++ 2.0, including the device's own marketing name, so a G502 X reports as "Logitech G502 X LIGHTSPEED" rather than "USB Receiver".
 
@@ -47,6 +47,8 @@ wireless-battery --json       # machine-readable
 wireless-battery --swiftbar   # SwiftBar plugin format
 wireless-battery --all        # include Bluetooth devices
 wireless-battery --debug      # dump HID traffic to stderr
+wireless-battery --probe      # read-only diagnostics for unsupported hardware
+wireless-battery --devices    # what this build knows about
 ```
 
 The menu bar shows up to three devices side by side and the dropdown lists them all. When more devices than that are connected, the lowest batteries take the slots, since those are the ones worth knowing about:
@@ -91,13 +93,30 @@ The Nova base station speaks a simpler request/response protocol on its vendor H
 1. Write a one-byte `0xB0` status request as an output report.
 2. Read the status report back:
 
-| Byte | Meaning |
+The families share that request but **not** the reply layout, which is why the model is looked up per product ID rather than assumed:
+
+| Nova 5 / 5X | Meaning |
 |------|---------|
-| 1    | `0x02` = headset powered off or out of range |
-| 3    | battery percentage, already 0–100 |
-| 4    | `0x01` = charging |
+| byte 1 | `0x02` = headset powered off or out of range |
+| byte 3 | battery percentage, already 0–100 |
+| byte 4 | `0x01` = charging |
+
+| Nova 7 family | Meaning |
+|------|---------|
+| byte 3 | `0x00` = off or out of range; `0x01`/`0x02` = charging |
+| byte 2 | battery level — a 0–4 step on original firmware, a 0–100 percentage after the January 2026 update |
+
+Getting that wrong doesn't fail loudly: parsing a Nova 7 with the Nova 5 layout reports a status byte as a battery percentage. Product IDs and layouts follow HeadsetControl.
 
 No Input Monitoring permission is needed, because vendor usage pages aren't subject to the consent prompt that keyboards and pointing devices are. A read takes about 10 ms.
+
+## Adding devices
+
+There is no battery standard to lean on: a scan of every HID collection on a typical Mac finds none declaring the HID Battery System usage page (`0x85`) or Generic Device Controls' Battery Strength. Coverage is therefore per-vendor, and grows one device at a time.
+
+Drivers conform to `BatteryDriver` and look their hardware up in a shared device table, so adding a known device is a data change rather than a code change. You can try one without rebuilding by dropping JSON at `~/.config/wireless-battery/devices.json` (format in [docs/devices.example.json](docs/devices.example.json)).
+
+If you have hardware that isn't supported, `wireless-battery --probe` prints everything needed to add it, without sending the device anything. See [CONTRIBUTING.md](CONTRIBUTING.md), which also covers the safety rules for talking to unknown hardware.
 
 ## Credits
 
@@ -111,7 +130,7 @@ GPL-3.0, matching HeadsetControl, since the protocol details were learned from r
 
 Verified against real hardware: the Nova 5 battery read, the Nova offline/out-of-range branch, and the Logitech HID++ path (G502 X Lightspeed, including the name lookup).
 
-Not yet verified: the generic `BatteryPercent` fallback, since no device on hand publishes one. Reports welcome.
+Implemented but unverified, ported from HeadsetControl and marked as such by `--devices`: the Arctis Nova 7 family, in both its discrete 0-4 and percentage firmware variants. Also unverified: the generic `BatteryPercent` fallback, since no device on hand publishes one. Reports welcome.
 
 Not implemented: Razer HyperSpeed and Corsair Slipstream, which each need their own protocol.
 
