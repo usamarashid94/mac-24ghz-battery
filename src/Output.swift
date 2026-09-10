@@ -7,18 +7,34 @@ import Foundation
 
 /// Devices worth putting on screen.
 ///
-/// A device that has gone away — dongle unplugged, headset switched off, mouse
-/// asleep — is dropped rather than lingering with a remembered level, so the
-/// display reflects what is actually connected right now. It reappears on its
-/// own as soon as it answers again.
+/// A device that has gone for good — dongle unplugged, headset switched off —
+/// should drop out of the display rather than linger with a remembered level.
+/// But these devices flap: a wireless mouse sleeps within seconds of going
+/// idle, and a base station intermittently misses a poll. Hiding on the first
+/// missed answer makes the menu bar flicker, and when every device misses the
+/// same poll the item collapses to nothing, which reads as the app having died.
 ///
-/// Set WIRELESS_BATTERY_SHOW_OFFLINE=1 to keep showing them with their last
-/// known level and its age instead.
+/// So an unreachable device keeps its place, dimmed and with its level marked
+/// stale, until it has been gone for `offlineGraceSeconds`.
 let showOfflineDevices: Bool =
     ProcessInfo.processInfo.environment["WIRELESS_BATTERY_SHOW_OFFLINE"] == "1"
 
-func visibleReadings(_ readings: [DeviceReading]) -> [DeviceReading] {
-    showOfflineDevices ? readings : readings.filter(\.online)
+/// How long a device stays on screen after it stops answering.
+let offlineGraceSeconds: TimeInterval = {
+    guard let raw = ProcessInfo.processInfo.environment["WIRELESS_BATTERY_OFFLINE_GRACE"],
+          let value = TimeInterval(raw), value >= 0
+    else { return 180 }
+    return value
+}()
+
+func visibleReadings(_ readings: [DeviceReading], now: Date = Date()) -> [DeviceReading] {
+    if showOfflineDevices { return readings }
+    return readings.filter { reading in
+        if reading.online { return true }
+        // Never seen answering: nothing worth showing.
+        guard let lastSeen = reading.lastSeen else { return false }
+        return now.timeIntervalSince(lastSeen) <= offlineGraceSeconds
+    }
 }
 
 func icon(for reading: DeviceReading) -> String {

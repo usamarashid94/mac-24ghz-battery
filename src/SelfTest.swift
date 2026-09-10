@@ -202,7 +202,25 @@ enum SelfTest {
             reading("B", nil, online: false),
             reading("C", 20, online: true),
         ]
-        equal(visibleReadings(mixed).count, 2, "offline devices are hidden by default")
+        equal(visibleReadings(mixed).count, 2, "a device never seen answering is hidden")
+
+        // These devices flap: a mouse sleeps in seconds, a base station misses
+        // a poll. Hiding on the first miss makes the menu bar flicker, and can
+        // empty it entirely, which reads as the app having died.
+        func lapsed(_ name: String, secondsAgo: TimeInterval) -> DeviceReading {
+            var r = reading(name, 55, online: false)
+            r.stale = true
+            r.lastSeen = Date().addingTimeInterval(-secondsAgo)
+            return r
+        }
+
+        let now = Date()
+        equal(visibleReadings([lapsed("recent", secondsAgo: 5)], now: now).count, 1,
+              "a device that just missed a poll keeps its place")
+        equal(visibleReadings([lapsed("borderline", secondsAgo: offlineGraceSeconds - 5)], now: now).count, 1,
+              "a device inside the grace window stays visible")
+        equal(visibleReadings([lapsed("gone", secondsAgo: offlineGraceSeconds + 60)], now: now).count, 0,
+              "a device gone longer than the grace window drops out")
 
         // The menu bar keeps the lowest levels when more devices than fit.
         let many = [

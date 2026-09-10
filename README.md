@@ -138,7 +138,14 @@ A desktop or Notification Center widget needs Xcode, a signing identity, and an 
 
 ## Disconnected devices
 
-Only devices that answer right now are shown. A headset switched off, a mouse gone to sleep, or an unplugged dongle drops out of the display, and comes back on its own as soon as it answers again — within the refresh interval, or immediately when the menu is opened.
+A device that has gone for good — dongle unplugged, headset switched off — drops out of the display, and comes back on its own as soon as it answers again.
+
+It does not drop out immediately, though, because these devices flap. A wireless mouse sleeps within seconds of going idle and a base station intermittently misses a poll, so hiding on the first missed answer makes the menu bar flicker, and when every device misses the same poll the item empties entirely and looks like the app has died. An unreachable device therefore keeps its place, dimmed and with its level marked stale, until it has been gone for three minutes:
+
+```bash
+WIRELESS_BATTERY_OFFLINE_GRACE=0 wireless-battery    # drop it on the first missed poll
+WIRELESS_BATTERY_OFFLINE_GRACE=600 wireless-battery  # keep it for ten minutes
+```
 
 The last good reading is still cached, so if you would rather see departed devices with their remembered level and its age:
 
