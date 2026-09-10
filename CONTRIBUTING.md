@@ -44,6 +44,18 @@ Drop a JSON file at `~/.config/wireless-battery/devices.json` to add or correct 
 
 If it works, send a pull request adding the entry to `DeviceTable.builtin`.
 
+## Sending a change
+
+`main` is protected: changes go through a pull request, not a direct push.
+
+```bash
+git checkout -b your-change
+# ... work, then:
+./qa.sh
+git push -u origin your-change
+gh pr create --fill
+```
+
 ## Testing your change
 
 ```bash
