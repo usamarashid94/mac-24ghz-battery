@@ -101,12 +101,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
         guard !readings.isEmpty else {
-            button.attributedTitle = NSAttributedString(string: "")
-            button.image = NSImage(
+            // A lone glyph is easy to mistake for the app having quit, so the
+            // empty state carries text too.
+            button.image = nil
+            let empty = NSMutableAttributedString()
+            if let plug = NSImage(
                 systemSymbolName: "powerplug",
                 accessibilityDescription: "No devices connected"
-            )
-            button.image?.isTemplate = true
+            ) {
+                plug.isTemplate = true
+                let attachment = NSTextAttachment()
+                attachment.image = plug
+                let glyph = NSMutableAttributedString(attachment: attachment)
+                glyph.addAttribute(
+                    .baselineOffset, value: -1.0,
+                    range: NSRange(location: 0, length: glyph.length)
+                )
+                empty.append(glyph)
+            }
+            empty.append(NSAttributedString(
+                string: " —",
+                attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)]
+            ))
+            button.attributedTitle = empty
             return
         }
 
