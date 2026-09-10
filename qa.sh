@@ -81,5 +81,16 @@ WIRELESS_BATTERY_SHOW_OFFLINE=1 ./wireless-battery | sed 's/^/  /'
 count=$(WIRELESS_BATTERY_SHOW_OFFLINE=1 ./wireless-battery --json | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["devices"]))' 2>/dev/null || echo 0)
 if [ "$count" -gt 0 ]; then ok "$count device(s) detected"; else bad "no devices detected at all"; fi
 
+step "11. README device table is current"
+cp README.md /tmp/qa-readme.bak
+./tools/update-readme-devices.sh >/dev/null 2>&1
+if diff -q /tmp/qa-readme.bak README.md >/dev/null 2>&1; then
+    ok "README device table matches the code"
+else
+    bad "README device table is stale — run ./tools/update-readme-devices.sh"
+    diff /tmp/qa-readme.bak README.md | head -10
+fi
+cp /tmp/qa-readme.bak README.md
+
 printf '\n\033[1m%d passed, %d failed\033[0m\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

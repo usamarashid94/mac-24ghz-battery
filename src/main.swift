@@ -22,6 +22,8 @@ if arguments.contains("--help") || arguments.contains("-h") {
       --probe      read-only diagnostics for every USB HID device, to report
                    hardware that isn't supported yet
       --devices    list the devices this build knows about
+      --devices-markdown
+                   the same list as a markdown table, for the README
       --selftest   run the parser and formatting tests
       --all        also include Bluetooth devices that report battery
       --debug      dump HID traffic to stderr
@@ -38,6 +40,25 @@ if arguments.contains("--selftest") {
 
 if arguments.contains("--probe") {
     Probe.run(includeAll: arguments.contains("--all"))
+    exit(0)
+}
+
+// Emits the README's supported-devices table, so the documentation is
+// generated from the table rather than transcribed from it and left to rot.
+if arguments.contains("--devices-markdown") {
+    let byDriver = Dictionary(grouping: DeviceTable.entries, by: \.driver)
+    for driver in drivers where byDriver[driver.id] != nil {
+        guard let entries = byDriver[driver.id], !entries.isEmpty else { continue }
+        print("#### \(driver.displayName)\n")
+        print("| Device | Product ID | Reply layout | Confirmed on hardware |")
+        print("|---|---|---|---|")
+        for entry in entries.sorted(by: { ($0.name, $0.productID) < ($1.name, $1.productID) }) {
+            let variant = entry.variant.map { "`\($0)`" } ?? "—"
+            let mark = entry.isVerified ? "yes" : "not yet"
+            print(String(format: "| %@ | `0x%04X` | %@ | %@ |", entry.name, entry.productID, variant, mark))
+        }
+        print("")
+    }
     exit(0)
 }
 

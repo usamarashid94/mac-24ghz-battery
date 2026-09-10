@@ -23,6 +23,53 @@ macOS shows battery for Bluetooth accessories, but devices on a proprietary 2.4 
 
 Devices on a USB transport are treated as 2.4 GHz. Pass `--all` to include Bluetooth devices too, which macOS already reports elsewhere.
 
+### Supported devices
+
+Generated from the device table by `tools/update-readme-devices.sh`, and checked by `qa.sh`, so this list cannot drift from the code. `wireless-battery --devices` prints the same thing.
+
+**Logitech devices are not listed here.** They are discovered at runtime over HID++ rather than by product ID, so any Lightspeed or Unifying device that implements a battery feature works without being named — the receiver is asked what it has.
+
+"Confirmed on hardware" means somebody checked the reading against the physical device. Everything else is ported from another project's source and tested only against crafted frames; see [Status](#status).
+
+<!-- BEGIN DEVICES -->
+
+#### SteelSeries Arctis (vendor HID)
+
+| Device | Product ID | Reply layout | Confirmed on hardware |
+|---|---|---|---|
+| SteelSeries Arctis 1 | `0x12B3` | `arctis1` | not yet |
+| SteelSeries Arctis 1 Xbox | `0x12B6` | `arctis1` | not yet |
+| SteelSeries Arctis 7 | `0x1260` | `legacyArctis7` | not yet |
+| SteelSeries Arctis 7 2019 | `0x12AD` | `legacyArctis7` | not yet |
+| SteelSeries Arctis 7X | `0x12D7` | `arctis1` | not yet |
+| SteelSeries Arctis 9 | `0x12C2` | `arctis9` | not yet |
+| SteelSeries Arctis Nova 5 | `0x2232` | `nova5` | yes |
+| SteelSeries Arctis Nova 5X | `0x2253` | `nova5` | not yet |
+| SteelSeries Arctis Nova 7 | `0x2202` | `nova7Discrete` | not yet |
+| SteelSeries Arctis Nova 7 | `0x22A1` | `nova7Percent` | not yet |
+| SteelSeries Arctis Nova 7 Diablo IV | `0x223A` | `nova7Discrete` | not yet |
+| SteelSeries Arctis Nova 7 Diablo IV | `0x22A9` | `nova7Percent` | not yet |
+| SteelSeries Arctis Nova 7 Gen 2 | `0x227E` | `nova7Percent` | not yet |
+| SteelSeries Arctis Nova 7 WoW Edition | `0x227A` | `nova7Discrete` | not yet |
+| SteelSeries Arctis Nova 7X | `0x2206` | `nova7Discrete` | not yet |
+| SteelSeries Arctis Nova 7X | `0x22A4` | `nova7Discrete` | not yet |
+| SteelSeries Arctis Nova 7X | `0x22A5` | `nova7Percent` | not yet |
+| SteelSeries Arctis Nova 7X v2 | `0x2258` | `nova7Percent` | not yet |
+| SteelSeries Arctis Nova 7X v2 | `0x229E` | `nova7Percent` | not yet |
+| SteelSeries Arctis Nova 7X v2 | `0x22AD` | `nova7Percent` | not yet |
+| SteelSeries Arctis Pro 2019 | `0x1252` | `legacyArctis7` | not yet |
+| SteelSeries Arctis Pro GameDAC | `0x1280` | `legacyArctis7` | not yet |
+
+#### Keychron mouse (0xB3 status request)
+
+| Device | Product ID | Reply layout | Confirmed on hardware |
+|---|---|---|---|
+| Keychron M3 | `0xD037` | `status` | not yet |
+| Keychron M5 | `0xD048` | `status` | not yet |
+| Keychron mouse receiver | `0xD028` | `status` | not yet |
+
+<!-- END DEVICES -->
+
 ## Install
 
 Requires only the Xcode Command Line Tools — no full Xcode, no code signing.
