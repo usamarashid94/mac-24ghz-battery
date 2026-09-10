@@ -7,6 +7,21 @@ cd "$(dirname "$0")"
 APP="build/Wireless Battery.app"
 MACOS="$APP/Contents/MacOS"
 
+# Rebuilding deletes the bundle. A running instance survives on the deleted
+# inode but loses its menu bar item, which looks exactly like the app having
+# crashed. Stop it first and put it back afterwards.
+WAS_RUNNING=0
+if pgrep -x WirelessBattery >/dev/null 2>&1; then
+    WAS_RUNNING=1
+    echo "stopping the running app before rebuilding…"
+    pkill -x WirelessBattery || true
+    # Give it a moment to release the bundle.
+    for _ in 1 2 3 4 5; do
+        pgrep -x WirelessBattery >/dev/null 2>&1 || break
+        sleep 0.2
+    done
+fi
+
 rm -rf "$APP"
 mkdir -p "$MACOS"
 
@@ -37,4 +52,10 @@ cp app/Info.plist "$APP/Contents/Info.plist"
 codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "warning: ad-hoc signing failed"
 
 echo "built: $APP"
-echo "run it with: open '$APP'"
+
+if [ "$WAS_RUNNING" -eq 1 ]; then
+    open "$APP"
+    echo "relaunched the app"
+else
+    echo "run it with: open '$APP'"
+fi
