@@ -82,7 +82,7 @@ Battery isn't at a fixed address. Each device assigns its own index to each feat
 
 Ask root (index `0x00`) for feature `0x1004` (unified battery), falling back to `0x1000` (battery level status), then call the returned index. Replies come back as short (`0x10`) or long (`0x11`) reports, with `0xFF` in the feature slot marking an error.
 
-Pairing slots 1–6 are probed. A slot with nothing paired stays silent, while a paired device replies even to say "unsupported" — telling those apart means an empty slot costs one timeout rather than several.
+Pairing slots 1–6 are probed. Errors come back in two flavours and both must be parsed: HID++ 2.0 marks them with `0xFF` in the feature slot, while receivers also emit HID++ 1.0 errors using the `0x8F` sub-ID. Recognizing the 1.0 form is what makes an empty slot cost one fast reply instead of a full timeout.
 
 ### SteelSeries Arctis Nova
 
