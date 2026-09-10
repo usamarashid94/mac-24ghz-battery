@@ -52,6 +52,26 @@ if arguments.contains("--devices") {
     exit(0)
 }
 
+// Simulates a long-running host, such as a menu bar app, doing many refresh
+// cycles in one process. Retained session state must stay bounded.
+if let flagIndex = CommandLine.arguments.firstIndex(of: "--stress") {
+    let cycles = CommandLine.arguments.dropFirst(flagIndex + 1).first.flatMap(Int.init) ?? 50
+    print("running \(cycles) refresh cycles in one process…")
+    for cycle in 1...cycles {
+        // Each cycle in its own pool, mirroring how a dispatch block drains one
+        // per refresh. Without it, CoreFoundation temporaries pile up until exit
+        // and look like a leak.
+        autoreleasepool {
+            _ = collectReadings(includeBluetooth: false)
+        }
+        if cycle % 10 == 0 || cycle == cycles {
+            print("  cycle \(cycle): retained session buffers = \(RetainedSessionState.shared.count)")
+        }
+    }
+    print("done — retained count must stay at or below the cap, not grow with cycles")
+    exit(0)
+}
+
 let readings = collectReadings(includeBluetooth: arguments.contains("--all"))
 
 if arguments.contains("--json") {

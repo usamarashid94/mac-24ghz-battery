@@ -58,11 +58,45 @@ final class ReportSink {
 
 /// An active device is chatty: a mouse in use streams input reports on the same
 /// vendor interface we're querying. Those can land while a session is being torn
-/// down, so the callback context and its buffer are retained for the life of the
-/// process rather than freed — this is a short-lived CLI, and a few hundred bytes
-/// held to the end is the cheapest way to make late reports harmless.
-var retainedSinks: [ReportSink] = []
-var retainedBuffers: [UnsafeMutablePointer<UInt8>] = []
+/// down, so a session's callback context and buffer outlive the session itself.
+///
+/// They are not kept forever. Holding them for the life of the process is fine
+/// for a 70 ms CLI, but a menu bar app refreshing every 30 seconds would retain
+/// thousands of them a day — a real leak. Instead the last `capacity` are kept
+/// and older ones released: by the time that many sessions have come and gone,
+/// any in-flight report for the oldest is long delivered.
+final class RetainedSessionState {
+    private struct Entry {
+        let sink: ReportSink
+        let buffer: UnsafeMutablePointer<UInt8>
+        let size: Int
+    }
+
+    static let shared = RetainedSessionState()
+
+    private let capacity = 32
+    private var entries: [Entry] = []
+    private let lock = NSLock()
+
+    func retain(sink: ReportSink, buffer: UnsafeMutablePointer<UInt8>, size: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        entries.append(Entry(sink: sink, buffer: buffer, size: size))
+        while entries.count > capacity {
+            let oldest = entries.removeFirst()
+            oldest.buffer.deinitialize(count: oldest.size)
+            oldest.buffer.deallocate()
+        }
+    }
+
+    /// Number currently held. Used by tests to prove the cap holds.
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return entries.count
+    }
+}
 
 private let inputReportCallback: IOHIDReportCallback = { context, _, _, _, reportID, report, reportLength in
     guard let context, reportLength > 0 else { return }
@@ -105,8 +139,7 @@ final class HIDSession {
         self.buffer.initialize(repeating: 0, count: bufferSize)
         self.sink = ReportSink()
 
-        retainedSinks.append(sink)
-        retainedBuffers.append(buffer)
+        RetainedSessionState.shared.retain(sink: sink, buffer: buffer, size: bufferSize)
 
         let context = Unmanaged.passUnretained(sink).toOpaque()
         IOHIDDeviceRegisterInputReportCallback(device, buffer, bufferSize, inputReportCallback, context)

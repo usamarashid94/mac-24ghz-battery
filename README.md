@@ -59,6 +59,23 @@ WIRELESS_BATTERY_MENUBAR_MAX=1 wireless-battery --swiftbar   # just the lowest
 
 Set that variable in the plugin script to change the cap.
 
+## Menu bar app
+
+There is also a native menu bar app, if you'd rather not run SwiftBar:
+
+```bash
+./build-app.sh
+open "build/Wireless Battery.app"
+```
+
+It shows the same line in the menu bar, with a dropdown listing every device, colour-coded by level, plus the time of the last reading, a manual refresh and an "Open at Login" toggle. It builds with the Command Line Tools alone — no Xcode, no signing identity — and is ad-hoc signed. Move it to `/Applications` if you want the login item to stick, since that needs a stable location.
+
+Reads happen on a background queue, never the main thread: an unreachable device costs a 1.5 second timeout, which would otherwise freeze the menu bar for that long. Refreshes run every 30 seconds and whenever the menu opens.
+
+### Why not a WidgetKit widget?
+
+A desktop or Notification Center widget needs Xcode, a signing identity, and an App Group container, because a widget extension is sandboxed and can't do IOKit HID work itself — the reading has to happen elsewhere and be handed over as a snapshot. More to the point, WidgetKit budgets timeline reloads to a few dozen a day, so a widget would update roughly every 15 minutes. That is *less* live than the menu bar, for more moving parts.
+
 ## Sleeping devices
 
 A 2.4 GHz mouse or headset stops answering when it sleeps or powers off, which is exactly when you're most likely to look at a battery widget. Dropping it from the display would be the wrong answer, so the last good reading is cached and shown aged instead:

@@ -99,18 +99,15 @@ let menuBarLimit: Int = {
     return value
 }()
 
-func printSwiftBar(_ readings: [DeviceReading]) {
-    if readings.isEmpty {
-        print("🔌")
-        print("---")
-        print("No 2.4 GHz dongles connected | color=\(Palette.dim)")
-        return
-    }
 
-    // Menu bar: up to `menuBarLimit` devices side by side. When there are more
-    // than fit, the lowest batteries win the slots, since those are the ones
-    // that need attention — but they're then shown in the display's own order so
-    // the icons don't reshuffle as levels drift.
+/// The menu bar line, shared by the SwiftBar plugin and the menu bar app so the
+/// two can't drift apart.
+///
+/// Up to `menuBarLimit` devices side by side. When more are connected than fit,
+/// the lowest batteries win the slots, since those are the ones that need
+/// attention — but they are then shown in the display's own order so the icons
+/// don't reshuffle as levels drift.
+func menuBarTitle(for readings: [DeviceReading]) -> String {
     let byUrgency = readings.sorted { lhs, rhs in
         // A device with no level at all sorts last.
         (lhs.percent ?? Int.max) < (rhs.percent ?? Int.max)
@@ -125,7 +122,18 @@ func printSwiftBar(_ readings: [DeviceReading]) {
         let staleMark = reading.stale ? "·" : ""
         return "\(icon(for: reading)) \(level)\(charge)\(staleMark)"
     }
-    print(segments.joined(separator: "  "))
+    return segments.joined(separator: "  ")
+}
+
+func printSwiftBar(_ readings: [DeviceReading]) {
+    if readings.isEmpty {
+        print("🔌")
+        print("---")
+        print("No 2.4 GHz dongles connected | color=\(Palette.dim)")
+        return
+    }
+
+    print(menuBarTitle(for: readings))
 
     print("---")
     for reading in readings {
