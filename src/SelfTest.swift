@@ -240,6 +240,45 @@ enum SelfTest {
         check(parsed != nil, "JSON output must parse")
     }
 
+    // MARK: - Single instance
+
+    static func testInstancePolicy() {
+        let now = Date()
+        func inst(_ pid: Int32, _ offset: TimeInterval?) -> InstancePolicy.Instance {
+            .init(pid: pid, launched: offset.map { now.addingTimeInterval($0) })
+        }
+
+        // Nothing else running: just take the menu bar.
+        equal(InstancePolicy.decide(me: inst(10, 0), others: []),
+              .proceed(terminating: []), "a lone instance proceeds")
+
+        // Newest wins, so a freshly opened copy replaces the running one.
+        equal(InstancePolicy.decide(me: inst(20, 0), others: [inst(10, -60)]),
+              .proceed(terminating: [10]), "a newer instance replaces an older one")
+
+        // ...and an older one defers rather than fighting back.
+        equal(InstancePolicy.decide(me: inst(10, -60), others: [inst(20, 0)]),
+              .standDown, "an older instance stands down for a newer one")
+
+        // The race that matters: two started at the same instant. Exactly one
+        // must yield, or they kill each other and the menu bar ends up empty.
+        let a = inst(100, 0), b = inst(200, 0)
+        let aDecision = InstancePolicy.decide(me: a, others: [b])
+        let bDecision = InstancePolicy.decide(me: b, others: [a])
+        let survivors = [aDecision, bDecision].filter { $0 != .standDown }.count
+        equal(survivors, 1, "a simultaneous launch leaves exactly one survivor")
+
+        // Several older copies are all replaced at once.
+        equal(InstancePolicy.decide(me: inst(50, 0), others: [inst(10, -90), inst(20, -30)]),
+              .proceed(terminating: [10, 20]), "all older copies are replaced")
+
+        // An unknown launch date must never beat a known one.
+        equal(InstancePolicy.decide(me: inst(30, 0), others: [inst(40, nil)]),
+              .proceed(terminating: [40]), "an instance with no launch date counts as oldest")
+        equal(InstancePolicy.decide(me: inst(40, nil), others: [inst(30, 0)]),
+              .standDown, "an instance with no launch date yields to a dated one")
+    }
+
     // MARK: - Safety guards
 
     static func testGuards() {
@@ -288,6 +327,7 @@ enum SelfTest {
         testLogitechVoltage()
         testLogitechErrors()
         testDisplay()
+        testInstancePolicy()
         testGuards()
         testDeviceTable()
 

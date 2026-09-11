@@ -136,6 +136,18 @@ Reads happen on a background queue, never the main thread: an unreachable device
 
 A desktop or Notification Center widget needs Xcode, a signing identity, and an App Group container, because a widget extension is sandboxed and can't do IOKit HID work itself — the reading has to happen elsewhere and be handed over as a snapshot. More to the point, WidgetKit budgets timeline reloads to a few dozen a day, so a widget would update roughly every 15 minutes. That is *less* live than the menu bar, for more moving parts.
 
+## Only one copy at a time
+
+macOS only prevents relaunching the *same bundle path*. A copy in `/Applications`, a copy built from source, and a Gatekeeper-translocated copy all share one bundle identifier at three different paths, so without help all three run at once and each adds its own menu bar item.
+
+On launch the app therefore ends any copy that started before it and takes over the menu bar. Newest wins, so opening a freshly installed version replaces the running one. An instance that finds a *newer* copy quits instead — if both simply terminated each other, two launched at the same moment would leave no menu bar item at all.
+
+Two things this deliberately does not cover:
+
+**Another macOS user account.** Each login session gets its own menu bar, so each runs its own copy; one session cannot see or stop another's. That is normal, but both copies poll the same hardware, so if you use fast user switching, quit the app in the session you are not using.
+
+**Running straight from the .dmg.** Gatekeeper copies an unsigned app to a random read-only path before running it, which defeats the usual same-path check. Drag the app to `/Applications` and open it from there.
+
 ## Disconnected devices
 
 A device that has gone for good — dongle unplugged, headset switched off — drops out of the display, and comes back on its own as soon as it answers again.
