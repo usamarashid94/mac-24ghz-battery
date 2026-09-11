@@ -1,5 +1,7 @@
 # mac-24ghz-battery
 
+<img src="docs/icon.png" width="128" align="right" alt="">
+
 Battery level for 2.4 GHz wireless devices — the ones on a USB dongle — in the macOS menu bar, via [SwiftBar](https://github.com/swiftbar/SwiftBar).
 
 macOS shows battery for Bluetooth accessories, but devices on a proprietary 2.4 GHz dongle usually publish nothing at all. A SteelSeries Arctis Nova base station, for example, has no `BatteryPercent` anywhere in the IORegistry. This asks the hardware directly.
@@ -135,6 +137,18 @@ Reads happen on a background queue, never the main thread: an unreachable device
 ### Why not a WidgetKit widget?
 
 A desktop or Notification Center widget needs Xcode, a signing identity, and an App Group container, because a widget extension is sandboxed and can't do IOKit HID work itself — the reading has to happen elsewhere and be handed over as a snapshot. More to the point, WidgetKit budgets timeline reloads to a few dozen a day, so a widget would update roughly every 15 minutes. That is *less* live than the menu bar, for more moving parts.
+
+## The icon
+
+A dongle, mid-transmission, with its charge showing inside. The dongle is the one object that means *2.4 GHz* specifically rather than Bluetooth or Wi-Fi, and the USB tab on its left is the Mac it plugs into — so the mark carries device, power, band and host in one shape.
+
+It is drawn as geometry in `tools/make-icons.swift` and rendered at each size rather than scaled from a single master, so the stroke stays crisp at 16pt. Regenerate with:
+
+```bash
+./tools/make-icon.sh
+```
+
+The same artwork becomes the app icon, the mounted volume's icon, and the icon on the `.dmg` file itself.
 
 ## Only one copy at a time
 

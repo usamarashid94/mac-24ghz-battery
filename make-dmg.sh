@@ -44,13 +44,28 @@ Source, and instructions for building it yourself:
 https://github.com/usamarashid94/mac-24ghz-battery
 NOTE
 
-hdiutil create \
-    -volname "Wireless Battery" \
-    -srcfolder "$STAGE" \
-    -ov -format UDZO \
-    "$DMG" >/dev/null
+# The volume's own icon, shown when the .dmg is mounted.
+cp build/icons/AppIcon.icns "$STAGE/.VolumeIcon.icns"
 
+# Build read-write first: the "has a custom icon" flag can only be set on a
+# mounted, writable volume. Then compress.
+TEMP_DMG="build/staging.dmg"
+rm -f "$TEMP_DMG"
+hdiutil create -volname "Wireless Battery" -srcfolder "$STAGE" \
+    -ov -format UDRW "$TEMP_DMG" >/dev/null
+
+MOUNT=$(hdiutil attach -nobrowse -readwrite "$TEMP_DMG" | tail -1 | sed 's/.*\(\/Volumes\/.*\)/\1/')
+SetFile -a C "$MOUNT" 2>/dev/null || echo "note: could not flag the volume icon"
+hdiutil detach "$MOUNT" >/dev/null
+
+hdiutil convert "$TEMP_DMG" -format UDZO -o "$DMG" >/dev/null
+rm -f "$TEMP_DMG"
 rm -rf "$STAGE"
+
+# And the .dmg file itself, so it is not a generic disk image in Downloads.
+swiftc -O -framework AppKit -o build/set-file-icon tools/set-file-icon.swift 2>/dev/null
+build/set-file-icon build/icons/AppIcon.icns "$DMG" >/dev/null 2>&1 \
+    || echo "note: could not set the .dmg file icon"
 
 echo "built: $DMG"
 shasum -a 256 "$DMG" | awk '{print "sha256: "$1}'

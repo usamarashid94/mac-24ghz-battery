@@ -57,6 +57,12 @@ rm -rf build/arch
 
 cp app/Info.plist "$APP/Contents/Info.plist"
 
+# Icon: rendered from source each build, so the artwork and the code cannot
+# drift apart the way a checked-in binary asset would.
+./tools/make-icon.sh >/dev/null
+mkdir -p "$APP/Contents/Resources"
+cp build/icons/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+
 # Ad-hoc signature. Enough to run locally; a Developer ID would be needed to
 # distribute it or to make the login item reliable.
 codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "warning: ad-hoc signing failed"
