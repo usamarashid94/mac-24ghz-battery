@@ -32,6 +32,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard claimMenuBar() else {
+            NSApp.terminate(nil)
+            return
+        }
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "…"
         menu.delegate = self
@@ -56,6 +61,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// A menu about to open is the moment freshness matters most.
     func menuWillOpen(_ menu: NSMenu) {
         refresh()
+    }
+
+
+    // MARK: - Single instance
+
+    /// Ends any other copy of this app before taking over the menu bar.
+    ///
+    /// macOS only prevents a second launch of the *same bundle path*. A copy in
+    /// /Applications and a copy built from source are different paths, so both
+    /// run happily and each adds its own menu bar item — the user sees two
+    /// identical readouts and no way to tell which is which.
+    ///
+    /// The newest launch wins, so opening a freshly installed version replaces
+    /// the running one rather than sitting behind it.
+    /// Returns false when a newer instance is taking over and this one should quit.
+    private func claimMenuBar() -> Bool {
+        guard let identifier = Bundle.main.bundleIdentifier else { return true }
+
+        let me = InstancePolicy.Instance(
+            pid: ProcessInfo.processInfo.processIdentifier,
+            launched: NSRunningApplication.current.launchDate
+        )
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+            .filter { $0.processIdentifier != me.pid }
+
+        let decision = InstancePolicy.decide(
+            me: me,
+            others: others.map { .init(pid: $0.processIdentifier, launched: $0.launchDate) }
+        )
+
+        switch decision {
+        case .standDown:
+            note("another instance is newer; quitting so only one menu bar item remains")
+            return false
+
+        case let .proceed(terminating):
+            guard !terminating.isEmpty else { return true }
+            for other in others where terminating.contains(other.processIdentifier) {
+                note("replacing an older instance (pid \(other.processIdentifier))")
+                if !other.terminate() { other.forceTerminate() }
+            }
+            // Let their status items leave the menu bar before adding ours,
+            // so the handover doesn't flash two icons.
+            let deadline = Date().addingTimeInterval(2)
+            while Date() < deadline,
+                  NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+                      .contains(where: { $0.processIdentifier != me.pid }) {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            }
+            return true
+        }
+    }
+
+    private func note(_ message: String) {
+        FileHandle.standardError.write(Data("[app] \(message)\n".utf8))
     }
 
     // MARK: - Reading

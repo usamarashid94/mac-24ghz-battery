@@ -11,15 +11,25 @@ MACOS="$APP/Contents/MacOS"
 # inode but loses its menu bar item, which looks exactly like the app having
 # crashed. Stop it first and put it back afterwards.
 WAS_RUNNING=0
-if pgrep -x WirelessBattery >/dev/null 2>&1; then
+# Scoped to this user: pgrep/pkill match other accounts' processes too, but we
+# cannot signal those, so an unscoped check would spin waiting for a process
+# that is never going to exit.
+if pgrep -x -u "$(id -u)" WirelessBattery >/dev/null 2>&1; then
     WAS_RUNNING=1
     echo "stopping the running app before rebuilding…"
-    pkill -x WirelessBattery || true
+    pkill -x -u "$(id -u)" WirelessBattery || true
     # Give it a moment to release the bundle.
     for _ in 1 2 3 4 5; do
-        pgrep -x WirelessBattery >/dev/null 2>&1 || break
+        pgrep -x -u "$(id -u)" WirelessBattery >/dev/null 2>&1 || break
         sleep 0.2
     done
+fi
+
+# A copy under another login session keeps its own menu bar item and keeps
+# polling the same hardware. Nothing here can stop it, so say so rather than
+# leaving a mystery second icon.
+if pgrep -x WirelessBattery >/dev/null 2>&1 && ! pgrep -x -u "$(id -u)" WirelessBattery >/dev/null 2>&1; then
+    echo "note: another user account is running this app; that copy is untouched."
 fi
 
 rm -rf "$APP"
