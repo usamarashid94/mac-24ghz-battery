@@ -22,9 +22,24 @@ step "2. Build (menu bar app)"
 if ./build-app.sh >/tmp/qa-app.log 2>&1; then ok "app bundle builds"; else bad "app build failed"; cat /tmp/qa-app.log; fi
 
 step "3. Compiler warnings"
-warnings=$(grep -c 'warning:' /tmp/qa-build.log 2>/dev/null | head -1)
-warnings=${warnings:-0}
-if [ "$warnings" -eq 0 ]; then ok "no compiler warnings"; else bad "$warnings compiler warning(s)"; grep 'warning:' /tmp/qa-build.log | head -5; fi
+# Both build logs: a warning that only shows up in the app build (it links
+# extra frameworks the CLI doesn't) was missing from this check entirely
+# until a linker warning appeared here and went unnoticed by a green QA run.
+#
+# One line is allowlisted: newer Command Line Tools ship a compatibility
+# archive with no x86_64 slice, which the universal app build always hits.
+# Verified harmless — the linked x86_64 binary has no unresolved symbols
+# from it — so it's excluded by name rather than left to trip every run.
+KNOWN_BENIGN='ignoring file .*libswiftCompatibilityPacks\.a.*missing arch'
+new_warnings=$(cat /tmp/qa-build.log /tmp/qa-app.log 2>/dev/null     | grep 'warning:' | grep -Ev "$KNOWN_BENIGN")
+warnings=$(printf '%s' "$new_warnings" | grep -c . || true)
+if [ "$warnings" -eq 0 ]; then
+    ok "no compiler warnings (besides the allowlisted toolchain one)"
+else
+    bad "$warnings compiler warning(s)"
+    printf '%s
+' "$new_warnings" | head -5
+fi
 
 step "4. Self-test (parsers, formatting, guards, device table)"
 if ./wireless-battery --selftest; then ok "self-test passed"; else bad "self-test failed"; fi
