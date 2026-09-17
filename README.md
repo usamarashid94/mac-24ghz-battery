@@ -150,6 +150,14 @@ It is drawn as geometry in `tools/make-icons.swift` and rendered at each size ra
 
 The same artwork becomes the app icon, the mounted volume's icon, and the icon on the `.dmg` file itself.
 
+## The same device counted twice
+
+A wireless accessory can enumerate under two entirely different identities at once: a mouse read over its receiver has one product ID, and plugging it in over USB — to charge, say — makes its own wired interface a *second*, separate USB device with a different product ID, sometimes read by a different driver, sometimes without "Logitech" in the name at all. Nothing about that is wrong at the protocol level; it is just the same accessory showing up twice.
+
+Two readings whose names reduce to the same product — after dropping vendor names and connectivity words like "wireless" or "LIGHTSPEED" — are therefore shown as one row. Between duplicates, the app prefers whichever is more current: online over offline, charging over not, a reading with a level over one without.
+
+The one real cost: if you own **two identical accessories of the same model**, this collapses them into one. `WIRELESS_BATTERY_MERGE_DUPLICATES=0` turns that off and shows every reading exactly as found.
+
 ## Only one copy at a time
 
 macOS only prevents relaunching the *same bundle path*. A copy in `/Applications`, a copy built from source, and a Gatekeeper-translocated copy all share one bundle identifier at three different paths, so without help all three run at once and each adds its own menu bar item.
