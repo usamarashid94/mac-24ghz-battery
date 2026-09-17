@@ -75,7 +75,9 @@ Return a reading with `online: false` and a `note` for a device that is present 
 
 Reject a reply you cannot make sense of instead of clamping it into range. A level of 200 means the offsets are wrong, and clamping it to 100 turns a detectable bug into a confident lie.
 
-Protocols for most vendors are already documented in GPL projects worth porting from rather than reverse-engineering: [HeadsetControl](https://github.com/Sapd/HeadsetControl) for headsets, [Solaar](https://github.com/pwr-Solaar/Solaar) for Logitech (including the voltage-to-percentage curves older devices need), [OpenRazer](https://github.com/openrazer/openrazer) for Razer, [ckb-next](https://github.com/ckb-next/ckb-next) for Corsair. This project is GPL-3.0, so ports from them are license-clean — credit the source in a comment.
+Protocols for most vendors are already documented in GPL projects worth learning from rather than reverse-engineering: [HeadsetControl](https://github.com/Sapd/HeadsetControl) (GPL-3.0) for headsets, [Solaar](https://github.com/pwr-Solaar/Solaar) (GPL-2.0-only) for Logitech, including the voltage-to-percentage curves older devices need, [OpenRazer](https://github.com/openrazer/openrazer) for Razer, [ckb-next](https://github.com/ckb-next/ckb-next) for Corsair.
+
+Being GPL does not by itself make porting from them "clean" — GPL-2.0-only code cannot simply be relicensed into a GPL-3.0 project without the original author's permission, and this project has never asked for any. What actually makes this safe is that a port here takes *protocol facts* — a report ID, a byte offset, a command constant — not the other project's expression of them. Facts about how a device communicates are not copyrightable in the first place, in either direction, independent of any license. Re-implement the logic yourself in your own words and structure rather than transliterating theirs line-by-line, cite the exact source and its license in a comment, and this project's GPL-3.0 is chosen out of caution on top of that, not as the reason it's permitted.
 
 ## What cannot be supported
 

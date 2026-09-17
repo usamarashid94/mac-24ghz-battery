@@ -108,8 +108,24 @@ enum DeviceTable {
         return paths
     }
 
+    /// True if `url` is, or is reached through, a symlink.
+    ///
+    /// A plain read follows symlinks, so a config path under the user's own
+    /// home directory that had been replaced with a symlink would silently
+    /// read whatever it points at instead. Exploiting that needs an attacker
+    /// who can already write inside this user's home directory — at which
+    /// point they have far more direct options than this — but refusing to
+    /// follow a symlink here costs nothing and removes the question entirely.
+    static func isSymlinked(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink ?? false
+    }
+
     static func loadOverrides() -> [DeviceEntry] {
         for url in overridePaths {
+            guard !isSymlinked(url) else {
+                debugLog("device table at \(url.path) is a symlink, refusing to follow it")
+                continue
+            }
             guard let data = try? Data(contentsOf: url) else { continue }
             guard let entries = try? JSONDecoder().decode([DeviceEntry].self, from: data) else {
                 debugLog("device table at \(url.path) could not be parsed, ignoring")

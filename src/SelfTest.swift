@@ -392,6 +392,41 @@ enum SelfTest {
         }
     }
 
+    // MARK: - Override file safety
+
+    static func testOverrideSymlinkGuard() {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("wireless-battery-selftest-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let realFile = dir.appendingPathComponent("real-devices.json")
+        let symlinkFile = dir.appendingPathComponent("devices.json")
+        let payload = """
+        [{"vendorID": 1, "productID": 2, "name": "Selftest Device",
+          "driver": "hid-battery", "verified": false}]
+        """
+        try? payload.write(to: realFile, atomically: true, encoding: .utf8)
+
+        // A direct path to a real file must load normally...
+        check(!DeviceTable.isSymlinked(realFile), "a plain file must not be reported as a symlink")
+
+        // ...but a symlink to that same file must be refused outright, even
+        // though reading through it would succeed and parse as valid JSON.
+        try? FileManager.default.createSymbolicLink(at: symlinkFile, withDestinationURL: realFile)
+        check(DeviceTable.isSymlinked(symlinkFile), "a symlink at the override path must be detected")
+
+        let previous = ProcessInfo.processInfo.environment["WIRELESS_BATTERY_DEVICES"]
+        setenv("WIRELESS_BATTERY_DEVICES", symlinkFile.path, 1)
+        let loadedThroughSymlink = DeviceTable.loadOverrides()
+        setenv("WIRELESS_BATTERY_DEVICES", realFile.path, 1)
+        let loadedDirectly = DeviceTable.loadOverrides()
+        if let previous { setenv("WIRELESS_BATTERY_DEVICES", previous, 1) } else { unsetenv("WIRELESS_BATTERY_DEVICES") }
+
+        check(loadedThroughSymlink.isEmpty, "loadOverrides must refuse a symlinked config path")
+        equal(loadedDirectly.count, 1, "the same content loads normally from a real file")
+    }
+
     // MARK: - Runner
 
     static func run() -> Int32 {
@@ -406,6 +441,7 @@ enum SelfTest {
         testInstancePolicy()
         testGuards()
         testDeviceTable()
+        testOverrideSymlinkGuard()
 
         if failures.isEmpty {
             print("selftest: \(checks) checks passed")

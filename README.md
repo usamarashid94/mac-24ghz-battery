@@ -254,6 +254,10 @@ Drivers conform to `BatteryDriver` and look their hardware up in a shared device
 
 If you have hardware that isn't supported, `wireless-battery --probe` prints everything needed to add it, without sending the device anything. See [CONTRIBUTING.md](CONTRIBUTING.md), which also covers the safety rules for talking to unknown hardware.
 
+## Trademarks
+
+"SteelSeries", "Arctis", "Logitech", "Lightspeed" and "Keychron" are trademarks of their respective owners, named here only to describe which hardware this reads. This project is not affiliated with, endorsed by, or sponsored by any of them.
+
 ## Credits
 
 The Nova wire format was derived from [HeadsetControl](https://github.com/Sapd/HeadsetControl) by Sapd, which supports far more hardware across more platforms. If you want breadth — sidetone, EQ, chatmix, dozens of headsets — use that instead. This project exists only to put a number in the macOS menu bar with no dependencies.

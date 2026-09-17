@@ -7,7 +7,7 @@ import IOKit.hid
 
 /// Keychron wireless mice, over their own 2.4 GHz dongle.
 ///
-/// Protocol per keychron-battery-dkms (GPL-2.0):
+/// Protocol per keychron-battery-dkms (GPL-2.0-only, confirmed via its SPDX header):
 ///   send a feature report, ID 0xB3, payload [0xB3, 0x06, 0...]
 ///   the reply arrives as an input report [0xB4, 0x06, ...] with the
 ///   percentage at byte 20.

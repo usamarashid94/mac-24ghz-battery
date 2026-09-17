@@ -154,7 +154,7 @@ enum Logitech {
     /// Feature 0x1001: millivolts, not a percentage.
     ///
     /// Discharge is not linear, so a curve is needed. This one is Solaar's
-    /// (GPL-2.0), interpolated linearly between points — the same mapping their
+    /// (GPL-2.0-only), interpolated linearly between points — the same mapping their
     /// users have validated against Logitech's own reporting.
     static let voltageCurve: [(millivolts: Int, percent: Int)] = [
         (4186, 100), (4067, 90), (3989, 80), (3922, 70), (3859, 60),
