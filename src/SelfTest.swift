@@ -279,6 +279,81 @@ enum SelfTest {
               .standDown, "an instance with no launch date yields to a dated one")
     }
 
+    // MARK: - Same-accessory merge
+
+    static func testMergeSameAccessory() {
+        func reading(
+            _ name: String, _ percent: Int?, online: Bool,
+            charging: Bool = false, lastSeen: Date? = nil
+        ) -> DeviceReading {
+            DeviceReading(key: name + "-" + UUID().uuidString, name: name, percent: percent,
+                          charging: charging, online: online, transport: "2.4GHz",
+                          source: "test", note: nil, lastSeen: lastSeen)
+        }
+
+        // The reported bug: a mouse read wirelessly (stale, from before it
+        // went to charge) and the same mouse read fresh off its own wired USB
+        // descriptor once charging starts. Different key, different exact
+        // name, same physical accessory.
+        let wireless = reading("Logitech G502 X LIGHTSPEED", 54, online: false, lastSeen: Date())
+        let wiredCharging = reading("G502 X", 92, online: true, charging: true)
+        let merged = mergeSameAccessory([wireless, wiredCharging])
+        equal(merged.count, 1, "wireless + wired-charging readings of one mouse merge to one row")
+        equal(merged.first?.charging, true, "the charging reading wins over the stale wireless one")
+
+        // Isolate the charging tie-break from the online/percent ones: both
+        // readings are online and both have a level, so only the charging
+        // flag can decide — and it must win even against a higher percent,
+        // since "it's charging" is the more relevant fact to show.
+        let onlineNotCharging = reading("Logitech G502 X LIGHTSPEED", 95, online: true, charging: false)
+        let onlineCharging = reading("G502 X", 40, online: true, charging: true)
+        let chargingPick = mergeSameAccessory([onlineNotCharging, onlineCharging]).first
+        equal(chargingPick?.charging, true, "charging wins the tie-break even over a higher percent")
+        equal(chargingPick?.percent, 40, "the surviving reading is the charging one, not the higher number")
+
+        // Same idea the other way round: two online readings, neither
+        // charging — the one that actually has a level should still win over
+        // one that's online but reporting nothing yet.
+        let onlineNoLevel = reading("SteelSeries Arctis Nova 5", nil, online: true)
+        let onlineWithLevel = reading("Arctis Nova 5", 70, online: true)
+        let picked = mergeSameAccessory([onlineNoLevel, onlineWithLevel]).first
+        equal(picked?.percent, 70, "between two online readings, the one with a level wins")
+
+        // Genuinely different products must never collapse into each other.
+        let mouse = reading("Logitech G502 X LIGHTSPEED", 54, online: true)
+        let headset = reading("SteelSeries Arctis Nova 5", 70, online: true)
+        let distinct = mergeSameAccessory([mouse, headset])
+        equal(distinct.count, 2, "two different accessories are never merged")
+
+        // Same model number but one more digit is a different product, not a
+        // dressed-up name for the same one.
+        check(
+            normalizedAccessoryName("Logitech G502 X LIGHTSPEED") != normalizedAccessoryName("Logitech G502"),
+            "G502 X and G502 must not normalize to the same product"
+        )
+        equal(
+            normalizedAccessoryName("Logitech G502 X LIGHTSPEED"),
+            normalizedAccessoryName("G502 X"),
+            "vendor prefix and connectivity suffix must not affect the normalized name"
+        )
+        check(
+            normalizedAccessoryName("SteelSeries Arctis Nova 5") != normalizedAccessoryName("SteelSeries Arctis Nova 7"),
+            "different model numbers must not normalize to the same product"
+        )
+
+        // The escape hatch: two identical accessories are a real, if rare,
+        // case where merging is the wrong call. WIRELESS_BATTERY_MERGE_DUPLICATES
+        // is read once into a global at process start, so it can't be
+        // exercised here without relaunching — this only proves the function
+        // itself has an off switch, which the CLI wires up to the env var.
+        let bothOnline = reading("Same Model", 80, online: true)
+        let bothOnline2 = reading("Same Model", 60, online: true)
+        equal(mergeSameAccessory([bothOnline, bothOnline2], forceMerge: true).count, 1,
+              "merge collapses two identically-named readings when enabled")
+        equal(mergeSameAccessory([bothOnline, bothOnline2], forceMerge: false).count, 2,
+              "merge is skippable, for the two-identical-devices case")
+    }
+
     // MARK: - Safety guards
 
     static func testGuards() {
@@ -327,6 +402,7 @@ enum SelfTest {
         testLogitechVoltage()
         testLogitechErrors()
         testDisplay()
+        testMergeSameAccessory()
         testInstancePolicy()
         testGuards()
         testDeviceTable()
